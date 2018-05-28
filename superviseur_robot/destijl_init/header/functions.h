@@ -39,17 +39,25 @@ extern RT_TASK th_move;
 
 extern RT_MUTEX mutex_robotStarted;
 extern RT_MUTEX mutex_move;
+extern RT_MUTEX mutex_compteur;
 
 extern RT_SEM sem_barrier;
 extern RT_SEM sem_openComRobot;
 extern RT_SEM sem_serverOk;
 extern RT_SEM sem_startRobot;
+extern RT_SEM sem_comLost;
+extern RT_SEM sem_arenaValid;
+extern RT_SEM sem_startCam;
 
 extern RT_QUEUE q_messageToMon;
 
 extern int etatCommMoniteur;
 extern int robotStarted;
 extern char move;
+extern char computePos;
+extern char askArena;
+extern char closeCam;
+extern char arenaValid;
 
 extern int MSG_QUEUE_SIZE;
 

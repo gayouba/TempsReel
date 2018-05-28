@@ -50,9 +50,11 @@ void f_sendToMon(void * arg) {
             printf("%s : message {%s,%s} in queue\n", info.name, msg.header, msg.data);
 #endif
 
-            send_message_to_monitor(msg.header, msg.data);
+            err = send_message_to_monitor(msg.header, msg.data);
             free_msgToMon_data(&msg);
             rt_queue_free(&q_messageToMon, &msg);
+            if (err <= 0)
+                rt_sem_p(&sem_comLost, TM_INFINITE);
         } else {
             printf("Error msg queue write: %s\n", strerror(-err));
         }
@@ -81,7 +83,26 @@ void f_receiveFromMon(void *arg) {
 #ifdef _WITH_TRACE_
         printf("%s: msg {header:%s,data=%s} received from UI\n", info.name, msg.header, msg.data);
 #endif
-        if (strcmp(msg.header, HEADER_MTS_COM_DMB) == 0) {
+        if (strcmp(msg.header, HEADER_MTS_COM_CAMERA) == 0) {
+            // TODO: Mutexes ?
+            if (msg.data[0] == CAM_OPEN) { // Camera related data
+                rt_sem_v(&sem_startCam);
+            } else if (msg.data[0] == CAM_CLOSE) {
+                closeCam = 1;
+            } else if (msg.data[0] == CAM_ASK_ARENA) {
+                askArena = 1;
+            } else if (msg.data[0] == CAM_ARENA_CONFIRM) {
+                arenaValid = 1;
+                rt_sem_v(&sem_arenaValid);
+            } else if (msg.data[0] == CAM_ARENA_INFIRM) {
+                arenaValid = 0;
+                rt_sem_v(&sem_arenaValid);
+            } else if (msg.data[0] == CAM_COMPUTE_POSITION) {
+                computePos = 1;
+            } else if (msg.data[0] == CAM_STOP_COMPUTE_POSITION) {
+                computePos = 0;
+            }
+        } else if (strcmp(msg.header, HEADER_MTS_COM_DMB) == 0) {
             if (msg.data[0] == OPEN_COM_DMB) { // Open communication supervisor-robot
 #ifdef _WITH_TRACE_
                 printf("%s: message open Xbee communication\n", info.name);
@@ -184,6 +205,8 @@ void f_startRobot(void * arg) {
 }
 
 void f_move(void *arg) {
+    int err;
+
     /* INIT */
     RT_TASK_INFO info;
     rt_task_inquire(NULL, &info);
@@ -207,7 +230,18 @@ void f_move(void *arg) {
         rt_mutex_acquire(&mutex_robotStarted, TM_INFINITE);
         if (robotStarted) {
             rt_mutex_acquire(&mutex_move, TM_INFINITE);
-            send_command_to_robot(move);
+            err = send_command_to_robot(move);
+            if (err <= 0) {
+				rt_mutex_acquire(&mutex_compteur, TM_INFINITE);
+				compteur++;
+				rt_mutex_release(&mutex_compteur);
+                compteur ++;
+            } else {
+				rt_mutex_acquire(&mutex_compteur, TM_INFINITE);
+                compteur = 0;
+				rt_mutex_release(&mutex_compteur);
+            }
+            checkCompteur();
             rt_mutex_release(&mutex_move);
 #ifdef _WITH_TRACE_
             printf("%s: the movement %c was sent\n", info.name, move);
@@ -225,7 +259,7 @@ void f_cam(void *arg) {
 
 void f_battery(void *arg) {
 
-	int bat; 
+	int bat;
 
     /* INIT */
     RT_TASK_INFO info;
@@ -268,13 +302,10 @@ void f_battery(void *arg) {
 			checkCompteur();
 #ifdef _WITH_TRACE_
             printf("%s: the battery level was asked\n", info.name);
-#endif            
+#endif
         }
         rt_mutex_release(&mutex_robotStarted);
     }
-}
-	
-
 }
  
 void f_close(void *arg) {
@@ -282,9 +313,29 @@ void f_close(void *arg) {
 	int err; 
 
 	RT_TASK_INFO info;
-	
+    rt_task_inquire(NULL, &info);
+    printf("Init %s\n", info.name);
 
+    while (1) {
+#ifdef _WITH_TRACE_
+        printf("%s : Wait sem_comLost\n", info.name);
+#endif
+        rt_sem_p(&sem_comLost, TM_INFINITE);
+#ifdef _WITH_TRACE_
+        printf("%s : sem_comLost arrived => Closing\n", info.name);
+#endif
 
+        err = send_command_to_robot(CAM_CLOSE);
+        err = send_command_to_robot(DMB_STOP_MOVE);
+
+        err = close_communication_robot();
+        err = kill_nodejs();
+        err = close_server();
+
+        rt_mutex_acquire(&mutex_robotStarted, TM_INFINITE);
+        robotStarted = 0;
+        rt_mutex_release(&mutex_robotStarted);
+    }
 }
 
 void write_in_queue(RT_QUEUE *queue, MessageToMon msg) {
@@ -293,3 +344,19 @@ void write_in_queue(RT_QUEUE *queue, MessageToMon msg) {
     memcpy(buff, &msg, sizeof (MessageToMon));
     rt_queue_send(&q_messageToMon, buff, sizeof (MessageToMon), Q_NORMAL);
 }
+
+void checkCompteur() {
+	rt_mutex_acquire(&mutex_compteur, TM_INFINITE);
+    if(compteur >= 3) {
+        MessageToMon msg;
+
+        printf("Perte de communication robot-superviseur\n");
+
+        set_msgToMon_header(&msg, HEADER_STM_ACK);
+        write_in_queue(&q_messageToMon, msg);
+
+        err = close_communication_robot();
+    }
+	rt_mutex_release(&mutex_compteur);
+}
+

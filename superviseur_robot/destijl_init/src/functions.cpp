@@ -253,8 +253,88 @@ void f_move(void *arg) {
 
 void f_cam(void *arg) {
 
+	/*DECLARATIONS*/
+	Camera rpiCam;
+	Image imgVideo;
+	position positionRobots[20];
+	Arene * monArene;
+	Jpg compress;
 
+	/* INIT */
+    RT_TASK_INFO info;
+    rt_task_inquire(NULL, &info);
+    printf("Init %s\n", info.name);
+    rt_sem_p(&sem_barrier, TM_INFINITE);
 
+#ifdef _WITH_TRACE_
+        printf("%s : Wait sem_cam\n", info.name);
+#endif
+        rt_sem_p(&sem_startCam, TM_INFINITE);
+#ifdef _WITH_TRACE_
+        printf("%s : sem_cam arrived => open camera\n", info.name);
+#endif
+
+	err= open_camera(&rpiCam);
+
+	if (err==0) {
+#ifdef _WITH_TRACE_
+            printf("%s : the camera is started\n", info.name);
+#endif
+
+	/* PERIODIC START */
+#ifdef _WITH_TRACE_
+    printf("%s: start period\n", info.name);
+#endif
+    rt_task_set_periodic(NULL, TM_NOW, 100000000);
+    while (1) {
+#ifdef _WITH_TRACE_
+        printf("%s: Wait period \n", info.name);
+#endif
+		if (closeCam==0){
+			get_image(&rpiCam, &imgVideo);
+			if (computePos==1){
+				detect_position(&imgVideo,positionRobots,monArene);
+				draw_position(&imgVideo, &imgVideo, &positionRobots[0]);
+				MessageToMon msg;
+            	set_msgToMon_header(&msg, HEADER_STM_POS);
+				set_msgToMon_data(&msg, positionRobots); //adress ?
+            	write_in_queue(&q_messageToMon, msg);
+			}
+			if (askArena==1){
+				if (!monArene)
+					monArene=new Arene();
+				if(detectArena(&imgVideo, monArene)==0){
+					drawArena(&imgVideo,&imgVideo,monArene);
+					imgCompress(&imgVideo,&compress);
+					sendToUI("IMG",&compress);
+	   				sendToUI("POS",&positionRobots[0]);
+                    rt_sem_p(&sem_arenaValid, TM_INFINITE);
+					if (!arenaValid)
+						delete monArene;
+						monArene=NULL;
+				}else{
+#ifdef _WITH_TRACE_
+			        printf("%s: Arena detection failed \n", info.name);
+#endif
+				}
+			askArena=0;
+			} else {
+				drawArena(&imgVideo,&imgVideo,&monArene);
+				imgCompress(&imgVideo,&compress);
+				sendToUI("IMG",&compress);
+                sendToUI("POS",&positionRobots[0]);
+			}
+		}
+        rt_task_wait_period(NULL);
+		else {
+			break;
+			closeCam=0;
+		}
+	} else {
+#ifdef _WITH_TRACE_
+        printf("%s: failed to open camera \n", info.name);
+#endif
+	}
 }
 
 void f_battery(void *arg) {

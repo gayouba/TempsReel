@@ -296,7 +296,7 @@ void f_battery(void *arg) {
 				compteur = 0;
 				rt_mutex_release(&mutex_compteur);
 				MessageToMon msg;
-				set_msgToMon_header(&msg, bat);
+				set_msgToMon_header(&msg, bat+48);
 				write_in_queue(&q_messageToMon, msg);
 			}
 			checkCompteur();

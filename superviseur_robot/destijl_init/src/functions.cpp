@@ -3,6 +3,7 @@
 char mode_start;
 
 void write_in_queue(RT_QUEUE *, MessageToMon);
+void checkCompteur();
 
 void f_server(void *arg) {
     int err;
@@ -53,7 +54,7 @@ void f_sendToMon(void * arg) {
             err = send_message_to_monitor(msg.header, msg.data);
             free_msgToMon_data(&msg);
             rt_queue_free(&q_messageToMon, &msg);
-            if (err <= 0)
+            if (err < 0)
                 rt_sem_p(&sem_comLost, TM_INFINITE);
         } else {
             printf("Error msg queue write: %s\n", strerror(-err));
@@ -83,8 +84,7 @@ void f_receiveFromMon(void *arg) {
 #ifdef _WITH_TRACE_
         printf("%s: msg {header:%s,data=%s} received from UI\n", info.name, msg.header, msg.data);
 #endif
-        if (strcmp(msg.header, HEADER_MTS_COM_CAMERA) == 0) {
-            // TODO: Mutexes ?
+        if (strcmp(msg.header, HEADER_MTS_CAMERA) == 0) {
             if (msg.data[0] == CAM_OPEN) { // Camera related data
                 rt_sem_v(&sem_startCam);
             } else if (msg.data[0] == CAM_CLOSE) {
@@ -131,7 +131,7 @@ void f_receiveFromMon(void *arg) {
 
             }
         }
-    } while (err > 0);
+    } while (err >= 0);
 
 }
 
@@ -231,11 +231,10 @@ void f_move(void *arg) {
         if (robotStarted) {
             rt_mutex_acquire(&mutex_move, TM_INFINITE);
             err = send_command_to_robot(move);
-            if (err <= 0) {
+            if (err < 0) {
 				rt_mutex_acquire(&mutex_compteur, TM_INFINITE);
 				compteur++;
 				rt_mutex_release(&mutex_compteur);
-                compteur ++;
             } else {
 				rt_mutex_acquire(&mutex_compteur, TM_INFINITE);
                 compteur = 0;
@@ -256,9 +255,10 @@ void f_cam(void *arg) {
 	/*DECLARATIONS*/
 	Camera rpiCam;
 	Image imgVideo;
-	position positionRobots[20];
+	Position positionRobots[20];
 	Arene * monArene;
 	Jpg compress;
+	int err;
 
 	/* INIT */
     RT_TASK_INFO info;
@@ -278,58 +278,69 @@ void f_cam(void *arg) {
 
 	if (err==0) {
 #ifdef _WITH_TRACE_
-            printf("%s : the camera is started\n", info.name);
+        printf("%s : the camera is started\n", info.name);
 #endif
 
 	/* PERIODIC START */
 #ifdef _WITH_TRACE_
-    printf("%s: start period\n", info.name);
+        printf("%s: start period\n", info.name);
 #endif
-    rt_task_set_periodic(NULL, TM_NOW, 100000000);
-    while (1) {
+        rt_task_set_periodic(NULL, TM_NOW, 100000000);
+        while (1) {
 #ifdef _WITH_TRACE_
-        printf("%s: Wait period \n", info.name);
+            printf("%s: Wait period \n", info.name);
 #endif
-		if (closeCam==0){
-			get_image(&rpiCam, &imgVideo);
-			if (computePos==1){
-				detect_position(&imgVideo,positionRobots,monArene);
-				draw_position(&imgVideo, &imgVideo, &positionRobots[0]);
-				MessageToMon msg;
-            	set_msgToMon_header(&msg, HEADER_STM_POS);
-				set_msgToMon_data(&msg, positionRobots); //adress ?
-            	write_in_queue(&q_messageToMon, msg);
-			}
-			if (askArena==1){
-				if (!monArene)
-					monArene=new Arene();
-				if(detectArena(&imgVideo, monArene)==0){
-					drawArena(&imgVideo,&imgVideo,monArene);
-					imgCompress(&imgVideo,&compress);
-					sendToUI("IMG",&compress);
-	   				sendToUI("POS",&positionRobots[0]);
-                    rt_sem_p(&sem_arenaValid, TM_INFINITE);
-					if (!arenaValid)
-						delete monArene;
-						monArene=NULL;
-				}else{
+    		if (!closeCam){
+				printf("%s: cam not close \n", info.name);
+	    		get_image(&rpiCam, &imgVideo);
+		    	if (computePos==1){
+			    	detect_position(&imgVideo,positionRobots,monArene);
+				    draw_position(&imgVideo, &imgVideo, &positionRobots[0]);
+    				MessageToMon msg;
+                	set_msgToMon_header(&msg, HEADER_STM_POS);
+				    set_msgToMon_data(&msg, positionRobots); 
+                	write_in_queue(&q_messageToMon, msg);
+    			}
+	    		if (askArena==1){
+		    		if (!monArene)
+			    		monArene=new Arene();
+				    if(detect_arena(&imgVideo, monArene)==0){
+					    draw_arena(&imgVideo,&imgVideo,monArene);
+    					compress_image(&imgVideo,&compress);
+						MessageToMon msg;
+                		set_msgToMon_header(&msg, HEADER_STM_IMAGE);
+				    	set_msgToMon_data(&msg, &compress); 
+                		write_in_queue(&q_messageToMon, msg);
+						set_msgToMon_data(&msg,positionRobots); 
+                		write_in_queue(&q_messageToMon, msg);
+
+                        rt_sem_p(&sem_arenaValid, TM_INFINITE);
+				    	if (!arenaValid)
+					    	delete monArene;
+						    monArene=NULL;
+    				}else{
 #ifdef _WITH_TRACE_
-			        printf("%s: Arena detection failed \n", info.name);
+		    	        printf("%s: Arena detection failed \n", info.name);
 #endif
-				}
-			askArena=0;
-			} else {
-				drawArena(&imgVideo,&imgVideo,&monArene);
-				imgCompress(&imgVideo,&compress);
-				sendToUI("IMG",&compress);
-                sendToUI("POS",&positionRobots[0]);
-			}
-		}
-        rt_task_wait_period(NULL);
-		else {
-			break;
-			closeCam=0;
-		}
+			    	}
+    			    askArena=0;
+    			} else {
+	    			draw_arena(&imgVideo,&imgVideo,monArene);
+		    		compress_image(&imgVideo,&compress);
+			    	MessageToMon msg;
+            		set_msgToMon_header(&msg, HEADER_STM_IMAGE);
+			    	set_msgToMon_data(&msg, &compress); 
+            		write_in_queue(&q_messageToMon, msg);
+					set_msgToMon_data(&msg,&positionRobots[0]); 
+            		write_in_queue(&q_messageToMon, msg);
+    			}
+    		    rt_task_wait_period(NULL);
+		    }
+		    else {
+			    break;
+			    closeCam=0;
+		    }
+	    }
 	} else {
 #ifdef _WITH_TRACE_
         printf("%s: failed to open camera \n", info.name);
@@ -365,7 +376,7 @@ void f_battery(void *arg) {
         if (robotStarted) {
             bat = send_command_to_robot(DMB_GET_VBAT);
 			if (bat < 0) {
-			#ifdef _WITH_TRACE_
+			#ifdef _WITH_TRACE_HEADER_MTS_COM_CAMERA
 				printf("%s : error send command to robot\n", info.name);
 			#endif
 				rt_mutex_acquire(&mutex_compteur, TM_INFINITE);
@@ -376,7 +387,9 @@ void f_battery(void *arg) {
 				compteur = 0;
 				rt_mutex_release(&mutex_compteur);
 				MessageToMon msg;
-				set_msgToMon_header(&msg, bat+48);
+				bat+=48;
+				set_msgToMon_header(&msg, HEADER_STM_BAT);
+				set_msgToMon_data(&msg, &bat);
 				write_in_queue(&q_messageToMon, msg);
 			}
 			checkCompteur();
@@ -435,7 +448,7 @@ void checkCompteur() {
         set_msgToMon_header(&msg, HEADER_STM_ACK);
         write_in_queue(&q_messageToMon, msg);
 
-        err = close_communication_robot();
+        close_communication_robot();
     }
 	rt_mutex_release(&mutex_compteur);
 }

@@ -58,6 +58,7 @@ extern char computePos;
 extern char askArena;
 extern char closeCam;
 extern char arenaValid;
+extern char compteur;
 
 extern int MSG_QUEUE_SIZE;
 

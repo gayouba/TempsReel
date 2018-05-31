@@ -67,6 +67,7 @@ char computePos = 0;
 char askArena = 0;
 char closeCam = 0;
 char arenaValid = 0;
+char compteur = 0;
 
 /**
  * \fn void initStruct(void)

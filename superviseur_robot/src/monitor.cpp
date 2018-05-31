@@ -147,7 +147,9 @@ int receive(char *data) {
 }
 
 int serverSend(const void *data, int dataLength) {
-    if (send(csock, data, dataLength, 0) != dataLength) {
+	int rcv_data_lng = send(csock, data, dataLength, 0);
+    if (rcv_data_lng != dataLength) {
+        printf("rcv : %d %d\n",rcv_data_lng,dataLength);
         perror("Send failed : ");
         return false;
     }

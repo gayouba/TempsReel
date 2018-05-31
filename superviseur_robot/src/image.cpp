@@ -61,6 +61,7 @@ void get_image(Camera *camera, Image * monImage, const char  * fichier) // getIm
     camera->retrieve(*monImage);
     cvtColor(*monImage,*monImage,CV_BGR2RGB);
 #else
+#error msg test get_image
     stubImg = imread(fichier, CV_LOAD_IMAGE_COLOR);
     stubImg.copyTo(*monImage);
 #endif

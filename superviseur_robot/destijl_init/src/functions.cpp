@@ -229,6 +229,9 @@ void f_move(void *arg) {
 #endif
         rt_mutex_acquire(&mutex_robotStarted, TM_INFINITE);
         if (robotStarted) {
+#ifdef _WITH_TRACE_
+			printf("%s : error send command to robot\n", info.name);
+#endif
             rt_mutex_acquire(&mutex_move, TM_INFINITE);
             err = send_command_to_robot(move);
             if (err < 0) {
@@ -279,57 +282,40 @@ void f_cam(void *arg) {
 #endif
 
 	err= open_camera(&rpiCam);
-	printf("%d\n",__LINE__);
 
 	if (err==0) {
 #ifdef _WITH_TRACE_
         printf("%s : the camera is started\n", info.name);
 #endif
 		send_message_to_monitor(HEADER_STM_ACK,(void*)"");
-		printf("%d\n",__LINE__);
 	/* PERIODIC START */
 #ifdef _WITH_TRACE_
         printf("%s: start period\n", info.name);
 #endif
-		printf("%d\n",__LINE__);
         rt_task_set_periodic(NULL, TM_NOW, 100000000);
-		printf("%d\n",__LINE__);
         while (1) {
 #ifdef _WITH_TRACE_
             printf("%s: Wait period \n", info.name);
 #endif
     		if (!closeCam){
 				printf("%s: cam not close \n", info.name);
-				printf("%d\n",__LINE__);
 	    		get_image(&rpiCam, &imgVideo);
-				printf("%d\n",__LINE__);
 		    	if (computePos==1){
-					printf("%d\n",__LINE__);
 			    	detect_position(&imgVideo,positionRobots,monArene);
-					printf("%d\n",__LINE__);
 				    draw_position(&imgVideo, &imgVideo, &positionRobots[0]);
-					printf("%d\n",__LINE__);
 					send_message_to_monitor(HEADER_STM_POS,&(positionRobots[0]));
-					printf("%d\n",__LINE__);
     			}
 	    		if (askArena==1){
 		    		if (!monArene){
-						printf("%d\n",__LINE__);
 			    		monArene=new Arene();
-						printf("%d\n",__LINE__);
 					}
 				    if(detect_arena(&imgVideo, monArene)==0){
-						printf("%d\n",__LINE__);
 					    draw_arena(&imgVideo,&imgVideo,monArene);
-						printf("%d\n",__LINE__);
 						compress_image(&imgVideo,&compress);
 						send_message_to_monitor(HEADER_STM_IMAGE,&compress);
-						printf("%d\n",__LINE__);
 						send_message_to_monitor(HEADER_STM_POS,&(positionRobots[0]));
                         rt_sem_p(&sem_arenaValid, TM_INFINITE);
-						printf("%d\n",__LINE__);
 				    	if (!arenaValid){
-							printf("%d\n",__LINE__);
 					    	delete monArene;
  							monArene=NULL;						
 						}
@@ -341,12 +327,9 @@ void f_cam(void *arg) {
 			    	}
     			    askArena=0;
     			} else {
-					printf("%d\n",__LINE__);
 					if(monArene){
 	    				draw_arena(&imgVideo,&imgVideo,monArene);
-						printf("%d\n",__LINE__);
 					}
-					printf("%d\n",__LINE__);
 		    		compress_image(&imgVideo,&compress);
 					send_message_to_monitor(HEADER_STM_IMAGE,&compress);
 					send_message_to_monitor(HEADER_STM_POS,&(positionRobots[0]));
@@ -355,7 +338,6 @@ void f_cam(void *arg) {
 		    }
 		    else {
 				send_message_to_monitor(HEADER_STM_ACK,(void*)"");
-				printf("%d\n",__LINE__);
 				close_camera(&rpiCam);
 			    closeCam=0;
 			    break;
@@ -365,7 +347,6 @@ void f_cam(void *arg) {
 #ifdef _WITH_TRACE_
         printf("%s: failed to open camera \n", info.name);
 #endif
-		printf("%d\n",__LINE__);
 		send_message_to_monitor(HEADER_STM_NO_ACK,(void*)"");
 	}
 	}
@@ -393,15 +374,14 @@ void f_battery(void *arg) {
         rt_task_wait_period(NULL);
 #ifdef _WITH_TRACE_
         printf("%s: Periodic activation\n", info.name);
-        printf("%s: move equals %c\n", info.name, move);
 #endif
         rt_mutex_acquire(&mutex_robotStarted, TM_INFINITE);
         if (robotStarted) {
             bat = send_command_to_robot(DMB_GET_VBAT);
 			if (bat < 0) {
-			#ifdef _WITH_TRACE_HEADER_MTS_COM_CAMERA
+#ifdef _WITH_TRACE_
 				printf("%s : error send command to robot\n", info.name);
-			#endif
+#endif
 				rt_mutex_acquire(&mutex_compteur, TM_INFINITE);
 				compteur++;
 				rt_mutex_release(&mutex_compteur);

@@ -177,15 +177,15 @@ void initStruct(void) {
         printf("Error task create: %s\n", strerror(-err));
         exit(EXIT_FAILURE);
     }
-	if (err = rt_task_create(&th_cam, "th_cam", 0, PRIORITY_TCAM, 0)) {
+    if (err = rt_task_create(&th_cam, "th_cam", 0, PRIORITY_TCAM, 0)) {
         printf("Error task create: %s\n", strerror(-err));
         exit(EXIT_FAILURE);
     }
-	if (err = rt_task_create(&th_battery, "th_battery", 0, PRIORITY_TBATTERY, 0)) {
+    if (err = rt_task_create(&th_battery, "th_battery", 0, PRIORITY_TBATTERY, 0)) {
         printf("Error task create: %s\n", strerror(-err));
         exit(EXIT_FAILURE);
     }
-	if (err = rt_task_create(&th_close, "th_close", 0, PRIORITY_TCLOSE, 0)) {
+    if (err = rt_task_create(&th_close, "th_close", 0, PRIORITY_TCLOSE, 0)) {
         printf("Error task create: %s\n", strerror(-err));
         exit(EXIT_FAILURE);
     }
@@ -200,7 +200,7 @@ void initStruct(void) {
 void startTasks() {
 
     int err;
-    
+
     if (err = rt_task_start(&th_startRobot, &f_startRobot, NULL)) {
         printf("Error task start: %s\n", strerror(-err));
         exit(EXIT_FAILURE);
@@ -222,15 +222,15 @@ void startTasks() {
         printf("Error task start: %s\n", strerror(-err));
         exit(EXIT_FAILURE);
     }
-	if (err = rt_task_start(&th_cam, &f_cam, NULL)) {
+    if (err = rt_task_start(&th_cam, &f_cam, NULL)) {
         printf("Error task start: %s\n", strerror(-err));
         exit(EXIT_FAILURE);
     }
-	if (err = rt_task_start(&th_battery, &f_battery, NULL)) {
+    if (err = rt_task_start(&th_battery, &f_battery, NULL)) {
         printf("Error task start: %s\n", strerror(-err));
         exit(EXIT_FAILURE);
     }
-	if (err = rt_task_start(&th_close, &f_close, NULL)) {
+    if (err = rt_task_start(&th_close, &f_close, NULL)) {
         printf("Error task start: %s\n", strerror(-err));
         exit(EXIT_FAILURE);
     }
@@ -244,6 +244,6 @@ void deleteTasks() {
     rt_task_delete(&th_server);
     rt_task_delete(&th_openComRobot);
     rt_task_delete(&th_move);
-	rt_task_delete(&th_cam);
-	rt_task_delete(&th_battery);
+    rt_task_delete(&th_cam);
+    rt_task_delete(&th_battery);
 }

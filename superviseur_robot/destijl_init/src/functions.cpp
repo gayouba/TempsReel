@@ -230,18 +230,18 @@ void f_move(void *arg) {
         rt_mutex_acquire(&mutex_robotStarted, TM_INFINITE);
         if (robotStarted) {
 #ifdef _WITH_TRACE_
-			printf("%s : error send command to robot\n", info.name);
+            printf("%s : error send command to robot\n", info.name);
 #endif
             rt_mutex_acquire(&mutex_move, TM_INFINITE);
             err = send_command_to_robot(move);
             if (err < 0) {
-				rt_mutex_acquire(&mutex_compteur, TM_INFINITE);
-				compteur++;
-				rt_mutex_release(&mutex_compteur);
+                rt_mutex_acquire(&mutex_compteur, TM_INFINITE);
+                compteur++;
+                rt_mutex_release(&mutex_compteur);
             } else {
-				rt_mutex_acquire(&mutex_compteur, TM_INFINITE);
+                rt_mutex_acquire(&mutex_compteur, TM_INFINITE);
                 compteur = 0;
-				rt_mutex_release(&mutex_compteur);
+                rt_mutex_release(&mutex_compteur);
             }
             checkCompteur();
             rt_mutex_release(&mutex_move);
@@ -255,23 +255,23 @@ void f_move(void *arg) {
 
 void f_cam(void *arg) {
 
-	/*DECLARATIONS*/
-	Camera rpiCam;
-	Image imgVideo;
-	Position positionRobots[20];
-	Arene * monArene;
-	Jpg compress;
-	int err;
-	MessageToMon msgPos;
-	MessageToMon msgImg;
+    /*DECLARATIONS*/
+    Camera rpiCam;
+    Image imgVideo;
+    Position positionRobots[20];
+    Arene * monArene;
+    Jpg compress;
+    int err;
+    MessageToMon msgPos;
+    MessageToMon msgImg;
 
-	/* INIT */
+    /* INIT */
     RT_TASK_INFO info;
     rt_task_inquire(NULL, &info);
     printf("Init %s\n", info.name);
     rt_sem_p(&sem_barrier, TM_INFINITE);
 
-	while(1){
+    while(1){
 
 #ifdef _WITH_TRACE_
         printf("%s : Wait sem_cam\n", info.name);
@@ -281,80 +281,80 @@ void f_cam(void *arg) {
         printf("%s : sem_cam arrived => open camera\n", info.name);
 #endif
 
-	err= open_camera(&rpiCam);
+        err= open_camera(&rpiCam);
 
-	if (err==0) {
+        if (err==0) {
 #ifdef _WITH_TRACE_
-        printf("%s : the camera is started\n", info.name);
+            printf("%s : the camera is started\n", info.name);
 #endif
-		send_message_to_monitor(HEADER_STM_ACK,(void*)"");
-	/* PERIODIC START */
+            send_message_to_monitor(HEADER_STM_ACK,(void*)"");
+            /* PERIODIC START */
 #ifdef _WITH_TRACE_
-        printf("%s: start period\n", info.name);
+            printf("%s: start period\n", info.name);
 #endif
-        rt_task_set_periodic(NULL, TM_NOW, 100000000);
-        while (1) {
+            rt_task_set_periodic(NULL, TM_NOW, 100000000);
+            while (1) {
 #ifdef _WITH_TRACE_
-            printf("%s: Wait period \n", info.name);
+                printf("%s: Wait period \n", info.name);
 #endif
-    		if (!closeCam){
-				printf("%s: cam not close \n", info.name);
-	    		get_image(&rpiCam, &imgVideo);
-		    	if (computePos==1){
-			    	detect_position(&imgVideo,positionRobots,monArene);
-				    draw_position(&imgVideo, &imgVideo, &positionRobots[0]);
-					send_message_to_monitor(HEADER_STM_POS,&(positionRobots[0]));
-    			}
-	    		if (askArena==1){
-		    		if (!monArene){
-			    		monArene=new Arene();
-					}
-				    if(detect_arena(&imgVideo, monArene)==0){
-					    draw_arena(&imgVideo,&imgVideo,monArene);
-						compress_image(&imgVideo,&compress);
-						send_message_to_monitor(HEADER_STM_IMAGE,&compress);
-						send_message_to_monitor(HEADER_STM_POS,&(positionRobots[0]));
-                        rt_sem_p(&sem_arenaValid, TM_INFINITE);
-				    	if (!arenaValid){
-					    	delete monArene;
- 							monArene=NULL;						
-						}
-						   
-    				}else{
+                if (!closeCam){
+                    printf("%s: cam not close \n", info.name);
+                    get_image(&rpiCam, &imgVideo);
+                    if (computePos==1){
+                        detect_position(&imgVideo,positionRobots,monArene);
+                        draw_position(&imgVideo, &imgVideo, &positionRobots[0]);
+                        send_message_to_monitor(HEADER_STM_POS,&(positionRobots[0]));
+                    }
+                    if (askArena==1){
+                        if (!monArene){
+                            monArene=new Arene();
+                        }
+                        if(detect_arena(&imgVideo, monArene)==0){
+                            draw_arena(&imgVideo,&imgVideo,monArene);
+                            compress_image(&imgVideo,&compress);
+                            send_message_to_monitor(HEADER_STM_IMAGE,&compress);
+                            send_message_to_monitor(HEADER_STM_POS,&(positionRobots[0]));
+                            rt_sem_p(&sem_arenaValid, TM_INFINITE);
+                            if (!arenaValid){
+                                delete monArene;
+                                monArene=NULL;						
+                            }
+
+                        }else{
 #ifdef _WITH_TRACE_
-		    	        printf("%s: Arena detection failed \n", info.name);
+                            printf("%s: Arena detection failed \n", info.name);
 #endif
-			    	}
-    			    askArena=0;
-    			} else {
-					if(monArene){
-	    				draw_arena(&imgVideo,&imgVideo,monArene);
-					}
-		    		compress_image(&imgVideo,&compress);
-					send_message_to_monitor(HEADER_STM_IMAGE,&compress);
-					send_message_to_monitor(HEADER_STM_POS,&(positionRobots[0]));
-    			}
-    		    rt_task_wait_period(NULL);
-		    }
-		    else {
-				send_message_to_monitor(HEADER_STM_ACK,(void*)"");
-				close_camera(&rpiCam);
-			    closeCam=0;
-			    break;
-		    }
-	    }
-	} else {
+                        }
+                        askArena=0;
+                    } else {
+                        if(monArene){
+                            draw_arena(&imgVideo,&imgVideo,monArene);
+                        }
+                        compress_image(&imgVideo,&compress);
+                        send_message_to_monitor(HEADER_STM_IMAGE,&compress);
+                        send_message_to_monitor(HEADER_STM_POS,&(positionRobots[0]));
+                    }
+                    rt_task_wait_period(NULL);
+                }
+                else {
+                    send_message_to_monitor(HEADER_STM_ACK,(void*)"");
+                    close_camera(&rpiCam);
+                    closeCam=0;
+                    break;
+                }
+            }
+        } else {
 #ifdef _WITH_TRACE_
-        printf("%s: failed to open camera \n", info.name);
+            printf("%s: failed to open camera \n", info.name);
 #endif
-		send_message_to_monitor(HEADER_STM_NO_ACK,(void*)"");
-	}
-	}
+            send_message_to_monitor(HEADER_STM_NO_ACK,(void*)"");
+        }
+    }
 }
 
 void f_battery(void *arg) {
 
-	int bat;
+    int bat;
 
     /* INIT */
     RT_TASK_INFO info;
@@ -362,7 +362,7 @@ void f_battery(void *arg) {
     printf("Init %s\n", info.name);
     rt_sem_p(&sem_barrier, TM_INFINITE);
 
-	/* PERIODIC START */
+    /* PERIODIC START */
 #ifdef _WITH_TRACE_
     printf("%s: start period\n", info.name);
 #endif
@@ -378,22 +378,22 @@ void f_battery(void *arg) {
         rt_mutex_acquire(&mutex_robotStarted, TM_INFINITE);
         if (robotStarted) {
             bat = send_command_to_robot(DMB_GET_VBAT);
-			if (bat < 0) {
+            if (bat < 0) {
 #ifdef _WITH_TRACE_
-				printf("%s : error send command to robot\n", info.name);
+                printf("%s : error send command to robot\n", info.name);
 #endif
-				rt_mutex_acquire(&mutex_compteur, TM_INFINITE);
-				compteur++;
-				rt_mutex_release(&mutex_compteur);
-			} else {
-				rt_mutex_acquire(&mutex_compteur, TM_INFINITE);
-				compteur = 0;
-				rt_mutex_release(&mutex_compteur);
-				MessageToMon msg;
-				bat+=48;
-				send_message_to_monitor(HEADER_STM_BAT,&bat);
-			}
-			checkCompteur();
+                rt_mutex_acquire(&mutex_compteur, TM_INFINITE);
+                compteur++;
+                rt_mutex_release(&mutex_compteur);
+            } else {
+                rt_mutex_acquire(&mutex_compteur, TM_INFINITE);
+                compteur = 0;
+                rt_mutex_release(&mutex_compteur);
+                MessageToMon msg;
+                bat+=48;
+                send_message_to_monitor(HEADER_STM_BAT,&bat);
+            }
+            checkCompteur();
 #ifdef _WITH_TRACE_
             printf("%s: the battery level was asked\n", info.name);
 #endif
@@ -401,12 +401,12 @@ void f_battery(void *arg) {
         rt_mutex_release(&mutex_robotStarted);
     }
 }
- 
-void f_close(void *arg) {
-	
-	int err; 
 
-	RT_TASK_INFO info;
+void f_close(void *arg) {
+
+    int err; 
+
+    RT_TASK_INFO info;
     rt_task_inquire(NULL, &info);
     printf("Init %s\n", info.name);
 
@@ -440,15 +440,15 @@ void write_in_queue(RT_QUEUE *queue, MessageToMon msg) {
 }
 
 void checkCompteur() {
-	rt_mutex_acquire(&mutex_compteur, TM_INFINITE);
+    rt_mutex_acquire(&mutex_compteur, TM_INFINITE);
     if(compteur >= 3) {
         MessageToMon msg;
 
         printf("Perte de communication robot-superviseur\n");
-		send_message_to_monitor(HEADER_STM_ACK,(void*) "");
+        send_message_to_monitor(HEADER_STM_ACK,(void*) "");
 
         close_communication_robot();
     }
-	rt_mutex_release(&mutex_compteur);
+    rt_mutex_release(&mutex_compteur);
 }
 
